@@ -1,31 +1,18 @@
 import pandas as pd
-from sklearn.preprocessing import StandardScaler
 
 
 def feature_engineering(df):
-
     df = df.copy()
 
-    # 1 Convert Boolean / Yes-No to Numeric
+    mapping = {"Yes": 1, "No": 0}
 
-    if df["International plan"].dtype == "object":
-        df["International plan"] = df["International plan"].map({"Yes":1,"No":0})
-
-    if df["Voice mail plan"].dtype == "object":
-        df["Voice mail plan"] = df["Voice mail plan"].map({"Yes":1,"No":0})
-
-    if df["Churn"].dtype == "object":
-        df["Churn"] = df["Churn"].map({"Yes":1,"No":0})
-
-
-    # 2 Drop High Cardinality Column
+    for col in ["International plan", "Voice mail plan", "Churn"]:
+        if col in df.columns and df[col].dtype == "object":
+            df[col] = df[col].map(mapping)
 
     if "State" in df.columns:
         df = df.drop("State", axis=1)
 
-
-    # 3 Remove Highly Correlated Features
-    # Charges are derived from minutes
 
     correlated_features = [
         "Total day charge",
@@ -34,37 +21,22 @@ def feature_engineering(df):
         "Total intl charge"
     ]
 
-    for col in correlated_features:
-        if col in df.columns:
-            df = df.drop(col, axis=1)
+    df = df.drop(columns=[col for col in correlated_features if col in df.columns], errors='ignore')
 
+    required_min_cols = [
+        "Total day minutes", "Total eve minutes",
+        "Total night minutes", "Total intl minutes"
+    ]
 
-    # 4 Create New Useful Features
+    if all(col in df.columns for col in required_min_cols):
+        df["Total minutes"] = df[required_min_cols].sum(axis=1)
 
-    df["Total minutes"] = (
-        df["Total day minutes"]
-        + df["Total eve minutes"]
-        + df["Total night minutes"]
-        + df["Total intl minutes"]
-    )
+    required_call_cols = [
+        "Total day calls", "Total eve calls",
+        "Total night calls", "Total intl calls"
+    ]
 
-    df["Total calls"] = (
-        df["Total day calls"]
-        + df["Total eve calls"]
-        + df["Total night calls"]
-        + df["Total intl calls"]
-    )
-
-
-    # 5 Feature Scaling
-
-    scaler = StandardScaler()
-
-    numeric_cols = df.select_dtypes(include=["int64","float64"]).columns
-
-    numeric_cols = numeric_cols.drop("Churn")
-
-    df[numeric_cols] = scaler.fit_transform(df[numeric_cols])
-
+    if all(col in df.columns for col in required_call_cols):
+        df["Total calls"] = df[required_call_cols].sum(axis=1)
 
     return df
